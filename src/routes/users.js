@@ -3,8 +3,12 @@ import crypto from 'crypto';
 import { dbPool } from '../database.js';
 import { logAdminAction } from './auditLog.js';
 import { adminActionCounter } from '../metrics.js';
+import { authenticateToken, requireAdmin } from '../authMiddleware.js';
 
 const router = express.Router();
+
+router.use(authenticateToken);
+router.use(requireAdmin);
 
 // ---------------------------------------------------------------------------
 // Inlined from subscriptionService.js

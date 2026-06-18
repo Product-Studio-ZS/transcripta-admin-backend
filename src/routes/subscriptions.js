@@ -5,8 +5,12 @@ import { dbPool } from '../database.js';
 import config from '../config.js';
 import { logAdminAction } from './auditLog.js';
 import { adminActionCounter, autoRenewalAttemptCounter, subscriptionEventLogCounter, subscriptionEventLogFailedCounter } from '../metrics.js';
+import { authenticateToken, requireAdmin } from '../authMiddleware.js';
 
 const router = express.Router();
+
+router.use(authenticateToken);
+router.use(requireAdmin);
 
 // ---------------------------------------------------------------------------
 // Inlined helpers: parseLimitsJson + computeSubscriptionBillingFields

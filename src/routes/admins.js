@@ -5,8 +5,12 @@ import config from '../config.js';
 import { logAdminAction } from './auditLog.js';
 import { adminActionCounter } from '../metrics.js';
 import { generateBase32Secret, generateTotpUri } from '../utils/totp.js';
+import { authenticateToken, requireAdmin } from '../authMiddleware.js';
 
 const router = express.Router();
+
+router.use(authenticateToken);
+router.use(requireAdmin);
 
 // GET /admins — list all admin users
 router.get('/admins', async (req, res) => {

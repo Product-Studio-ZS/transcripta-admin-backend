@@ -1,7 +1,11 @@
 import express from 'express';
 import { dbPool } from '../database.js';
+import { authenticateToken, requireAdmin } from '../authMiddleware.js';
 
 const router = express.Router();
+
+router.use(authenticateToken);
+router.use(requireAdmin);
 
 // GET /payments — list with pagination and filters
 router.get('/payments', async (req, res) => {
