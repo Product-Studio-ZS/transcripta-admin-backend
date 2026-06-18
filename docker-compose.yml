@@ -1,0 +1,10 @@
+name: transcripta-admin-backend
+
+services:
+  admin-backend:
+    build: .
+    ports:
+      - "9002:9002"
+    env_file:
+      - .env
+    restart: unless-stopped

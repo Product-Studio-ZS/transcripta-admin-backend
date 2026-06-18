@@ -1,0 +1,21 @@
+{
+  "name": "transcripta-admin-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Admin backend for Transcripta SaaS platform",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "express": "^4.19",
+    "mysql2": "^3.22",
+    "jsonwebtoken": "^9.0.2",
+    "cors": "^2.8.5",
+    "prom-client": "^15.1.3",
+    "dotenv": "^16.4.7",
+    "bcryptjs": "^2.4.3",
+    "yookassa": "^0.1.1"
+  }
+}
