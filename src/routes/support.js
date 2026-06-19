@@ -76,11 +76,9 @@ router.post('/support/chats/:chatId/messages', async (req, res) => {
     const chat = chatRows[0];
 
     const botToken = config.telegram.botToken;
-    const targetChatId = config.telegram.targetChatId;
 
-    if (botToken && targetChatId) {
-      // Send /reply command to admin chat — bot picks it up and forwards to user
-      const replyCommand = `/reply ${chat.telegram_user_id} ${text}`;
+    if (botToken) {
+      // Send directly to user via Telegram Bot API
       try {
         const tgResponse = await fetch(
           `https://api.telegram.org/bot${botToken}/sendMessage`,
@@ -88,8 +86,8 @@ router.post('/support/chats/:chatId/messages', async (req, res) => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              chat_id: targetChatId,
-              text: replyCommand,
+              chat_id: chat.telegram_user_id,
+              text: text,
             }),
           }
         );
@@ -101,7 +99,6 @@ router.post('/support/chats/:chatId/messages', async (req, res) => {
             message: `Ошибка отправки в Telegram: ${tgResult.description}`,
           });
         }
-        console.log('[ADMIN-SUPPORT] Reply posted to admin chat:', replyCommand.substring(0, 80));
       } catch (tgError) {
         console.error('[ADMIN-SUPPORT] Telegram fetch error:', tgError);
         return res.status(502).json({
@@ -109,15 +106,6 @@ router.post('/support/chats/:chatId/messages', async (req, res) => {
           message: 'Ошибка связи с Telegram API',
         });
       }
-
-      // Future: send directly to user (skip bot relay)
-      // if (botToken) {
-      //   await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-      //     method: 'POST',
-      //     headers: { 'Content-Type': 'application/json' },
-      //     body: JSON.stringify({ chat_id: chat.telegram_user_id, text }),
-      //   });
-      // }
     }
 
     const [result] = await dbPool.query(
