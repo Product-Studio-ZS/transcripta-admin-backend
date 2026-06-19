@@ -12,7 +12,10 @@ export default {
     database: process.env.DB_NAME || 'transcripta',
   },
   cors: { origin: process.env.CORS_ORIGIN || 'https://admin.transcripta.ru' },
-  telegram: { botToken: process.env.TELEGRAM_BOT_TOKEN || '' },
+  telegram: {
+    botToken: process.env.TELEGRAM_BOT_TOKEN || '',
+    targetChatId: process.env.TELEGRAM_TARGET_CHAT_ID || '',
+  },
   totp: {
     issuer: process.env.TOTP_ISSUER || 'Transcripta',
     period: Number(process.env.TOTP_PERIOD) || 30,
