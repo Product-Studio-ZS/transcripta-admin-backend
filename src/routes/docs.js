@@ -113,17 +113,4 @@ router.get('/docs/tree', async (req, res) => {
   }
 });
 
-router.get('/docs/content', async (req, res) => {
-  const { repo, path } = req.query;
-  if (!repo || !path) return res.status(400).json({ error: 'repo and path required' });
-
-  const token = config.github?.token || '';
-  const fullPath = `/repos/${repo}/contents/${path}`;
-  const data = await fetchGitHub(fullPath, token);
-  if (!data || !data.content) return res.status(404).json({ error: 'File not found' });
-
-  const content = Buffer.from(data.content, 'base64').toString('utf-8');
-  res.json({ content, path, repo });
-});
-
 export default router;
