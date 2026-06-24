@@ -7,16 +7,9 @@ const router = express.Router();
 router.use(authenticateToken);
 router.use(requireAdmin);
 
-const DOCS_REPOS = [
-  { name: 'meta', repo: 'Product-Studio-ZS/transcripta', path: 'docs' },
-  { name: 'backend', repo: 'Product-Studio-ZS/transcripta-backend', path: 'docs' },
-  { name: 'frontend', repo: 'Product-Studio-ZS/transcripta-frontend', path: 'docs' },
-  { name: 'admin-panel', repo: 'Product-Studio-ZS/transcripta-admin-panel', path: 'docs' },
-  { name: 'support-bot', repo: 'Product-Studio-ZS/transcripta-support-bot', path: 'docs' },
-  { name: 'landing', repo: 'Product-Studio-ZS/transcripta-landing', path: 'docs' },
-  { name: 'ai', repo: 'Product-Studio-ZS/transcripta-ai', path: 'docs' },
-  { name: 'deploy', repo: 'Product-Studio-ZS/transcripta-deploy', path: 'docs' },
-];
+const DOCS_ORG = 'Product-Studio-ZS';
+const REPO_CACHE_TTL = 5 * 60 * 1000;
+let repoCache = null;
 
 async function fetchGitHub(path, token) {
   const headers = { Accept: 'application/vnd.github.v3+json' };
@@ -29,6 +22,41 @@ async function fetchGitHub(path, token) {
     return null;
   }
   return res.json();
+}
+
+async function discoverDocsRepos(token) {
+  if (repoCache && Date.now() - repoCache.at < REPO_CACHE_TTL) return repoCache.data;
+
+  // Get all repos in the org
+  const repos = await fetchGitHub(`/orgs/${DOCS_ORG}/repos?per_page=100&sort=full_name`, token);
+  if (!repos || !Array.isArray(repos)) return repoCache?.data || [];
+
+  const docsRepos = [];
+  for (const repo of repos) {
+    if (repo.archived || repo.fork) continue;
+    // Check for docs/ folder
+    const docsCheck = await fetchGitHub(`/repos/${repo.full_name}/contents/docs`, token);
+    if (docsCheck && Array.isArray(docsCheck) && docsCheck.length > 0) {
+      docsRepos.push({ name: repo.name, repo: repo.full_name, path: 'docs' });
+    }
+    // Also include root .md files (CLAUDE.md, README.md)
+    const rootCheck = await fetchGitHub(`/repos/${repo.full_name}/contents`, token);
+    if (rootCheck && Array.isArray(rootCheck)) {
+      const mdFiles = rootCheck.filter(f => f.type === 'file' && f.name.endsWith('.md'));
+      if (mdFiles.length > 0 && !docsRepos.find(r => r.repo === repo.full_name && r.path === '')) {
+        docsRepos.push({ name: repo.name, repo: repo.full_name, path: '' });
+      }
+    }
+  }
+  return docsRepos;
+}
+
+async function fetchRootMdFiles(repoFull, token) {
+  const data = await fetchGitHub(`/repos/${repoFull}/contents`, token);
+  if (!data || !Array.isArray(data)) return [];
+  return data
+    .filter(f => f.type === 'file' && f.name.endsWith('.md'))
+    .map(f => ({ name: f.name.replace(/\.md$/, ''), type: 'file', path: f.name }));
 }
 
 async function fetchTreeRecursive(repoFull, dirPath, token) {
@@ -62,10 +90,13 @@ async function fetchTreeRecursive(repoFull, dirPath, token) {
 router.get('/docs/tree', async (req, res) => {
   try {
     const token = config.github?.token || '';
+    const docsRepos = await discoverDocsRepos(token);
     const tree = [];
 
-    for (const repo of DOCS_REPOS) {
-      const files = await fetchTreeRecursive(repo.repo, repo.path, token);
+    for (const repo of docsRepos) {
+      const files = repo.path
+        ? await fetchTreeRecursive(repo.repo, repo.path, token)
+        : await fetchRootMdFiles(repo.repo, token);
       if (files && files.length > 0) {
         tree.push({
           name: repo.name,
