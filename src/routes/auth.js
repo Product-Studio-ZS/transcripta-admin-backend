@@ -67,6 +67,16 @@ router.post('/login', async (req, res) => {
     }
 
     const user = rows[0];
+
+    if (!user.password) {
+      adminLoginCounter.inc({ status: 'invalid_credentials' });
+      console.log(`[ADMIN-LOGIN] status=invalid_credentials email=*** ip=${req.ip}`);
+      return res.status(401).json({
+        success: false,
+        message: 'Неверные учетные данные'
+      });
+    }
+
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
