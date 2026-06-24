@@ -151,4 +151,45 @@ router.patch('/support/chats/:chatId/read', async (req, res) => {
   }
 });
 
+// POST /api/admin/support/chats/:chatId/link
+router.post('/support/chats/:chatId/link', async (req, res) => {
+  try {
+    const chatId = parseInt(req.params.chatId, 10);
+    const { email } = req.body;
+
+    if (!email || !email.trim()) {
+      return res.status(400).json({ success: false, message: 'email обязателен' });
+    }
+
+    const [chatRows] = await dbPool.query('SELECT * FROM support_chats WHERE id = ?', [chatId]);
+    if (chatRows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Чат не найден' });
+    }
+
+    const [userRows] = await dbPool.query(
+      'SELECT id, email, name FROM users WHERE email = ?',
+      [email.trim().toLowerCase()]
+    );
+    if (userRows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Пользователь с таким email не найден' });
+    }
+    const user = userRows[0];
+
+    const [existing] = await dbPool.query(
+      'SELECT id FROM support_chats WHERE linked_user_id = ? AND id != ?',
+      [user.id, chatId]
+    );
+    if (existing.length > 0) {
+      return res.status(409).json({ success: false, message: 'Пользователь уже привязан к другому чату' });
+    }
+
+    await dbPool.query('UPDATE support_chats SET linked_user_id = ? WHERE id = ?', [user.id, chatId]);
+
+    res.json({ success: true, linked_user: { id: user.id, email: user.email, name: user.name } });
+  } catch (error) {
+    console.error('[ADMIN-SUPPORT] Link user error:', error);
+    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+  }
+});
+
 export default router;
