@@ -21,8 +21,13 @@ const DOCS_REPOS = [
 async function fetchGitHub(path, token) {
   const headers = { Accept: 'application/vnd.github.v3+json' };
   if (token) headers.Authorization = `Bearer ${token}`;
-  const res = await fetch(`https://api.github.com${path}`, { headers });
-  if (!res.ok) return null;
+  const separator = path.includes('?') ? '&' : '?';
+  const url = `https://api.github.com${path}${separator}ref=main`;
+  const res = await fetch(url, { headers });
+  if (!res.ok) {
+    console.error(`[DOCS] GitHub API ${res.status} for ${path}: ${res.statusText}`);
+    return null;
+  }
   return res.json();
 }
 
