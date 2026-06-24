@@ -27,27 +27,27 @@ async function fetchGitHub(path, token) {
 async function discoverDocsRepos(token) {
   if (repoCache && Date.now() - repoCache.at < REPO_CACHE_TTL) return repoCache.data;
 
-  // Get all repos in the org
   const repos = await fetchGitHub(`/orgs/${DOCS_ORG}/repos?per_page=100&sort=full_name`, token);
   if (!repos || !Array.isArray(repos)) return repoCache?.data || [];
 
   const docsRepos = [];
   for (const repo of repos) {
     if (repo.archived || repo.fork) continue;
-    // Check for docs/ folder
     const docsCheck = await fetchGitHub(`/repos/${repo.full_name}/contents/docs`, token);
     if (docsCheck && Array.isArray(docsCheck) && docsCheck.length > 0) {
       docsRepos.push({ name: repo.name, repo: repo.full_name, path: 'docs' });
-    }
-    // Also include root .md files (CLAUDE.md, README.md)
-    const rootCheck = await fetchGitHub(`/repos/${repo.full_name}/contents`, token);
-    if (rootCheck && Array.isArray(rootCheck)) {
-      const mdFiles = rootCheck.filter(f => f.type === 'file' && f.name.endsWith('.md'));
-      if (mdFiles.length > 0 && !docsRepos.find(r => r.repo === repo.full_name && r.path === '')) {
-        docsRepos.push({ name: repo.name, repo: repo.full_name, path: '' });
+    } else {
+      const rootCheck = await fetchGitHub(`/repos/${repo.full_name}/contents`, token);
+      if (rootCheck && Array.isArray(rootCheck)) {
+        const mdFiles = rootCheck.filter(f => f.type === 'file' && f.name.endsWith('.md'));
+        if (mdFiles.length > 0) {
+          docsRepos.push({ name: repo.name, repo: repo.full_name, path: '' });
+        }
       }
     }
   }
+
+  repoCache = { data: docsRepos, at: Date.now() };
   return docsRepos;
 }
 
