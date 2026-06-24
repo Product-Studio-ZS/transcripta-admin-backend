@@ -27,4 +27,7 @@ export default {
     featureEnabled: process.env.FEATURE_RETENTION_OFFER !== 'false',
     discountPercent: parseInt(process.env.RETENTION_DISCOUNT_PERCENT, 10) || 50,
   },
+  github: {
+    token: process.env.GITHUB_TOKEN || '',
+  },
 };
