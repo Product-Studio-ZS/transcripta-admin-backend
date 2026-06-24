@@ -23,6 +23,10 @@ router.post('/transcriptions/:id/retry', async (req, res) => {
 
     const t = rows[0];
 
+    if (t.status !== 'error') {
+      return res.status(400).json({ success: false, message: 'Ретрай возможен только для транскрипций с ошибкой' });
+    }
+
     if (!t.s3_media_url && !t.source_url) {
       return res.status(400).json({ success: false, message: 'Нет источника для повторной обработки (s3_media_url или source_url)' });
     }
