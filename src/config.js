@@ -20,6 +20,9 @@ export default {
     issuer: process.env.TOTP_ISSUER || 'Transcripta',
     period: Number(process.env.TOTP_PERIOD) || 30,
   },
+  ai: {
+    serverBaseUrl: process.env.AI_SERVER_URL || 'http://127.0.0.1:10005',
+  },
   retention: {
     featureEnabled: process.env.FEATURE_RETENTION_OFFER !== 'false',
     discountPercent: parseInt(process.env.RETENTION_DISCOUNT_PERCENT, 10) || 50,

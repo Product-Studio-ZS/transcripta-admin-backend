@@ -9,6 +9,7 @@ import paymentsRoutes from './routes/payments.js';
 import subscriptionsRoutes from './routes/subscriptions.js';
 import adminsRoutes from './routes/admins.js';
 import supportRoutes from './routes/support.js';
+import transcriptionsRoutes from './routes/transcriptions.js';
 
 const app = express();
 
@@ -32,6 +33,7 @@ app.use('/api/admin', paymentsRoutes);
 app.use('/api/admin', subscriptionsRoutes);
 app.use('/api/admin', adminsRoutes);
 app.use('/api/admin', supportRoutes);
+app.use('/api/admin', transcriptionsRoutes);
 
 app.listen(config.port, () => {
   console.log(`Admin backend listening on port ${config.port}`);
