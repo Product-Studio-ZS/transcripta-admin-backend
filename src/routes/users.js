@@ -100,9 +100,11 @@ router.get('/users', async (req, res) => {
               u.subscription_plan, u.plan_id,
               COALESCE(p.display_name, u.subscription_plan) as subscription_plan_name,
               u.subscription_expires_at, u.subscription_auto_renewal,
-              u.transcriptions_remaining, u.is_blocked, u.created_at
+              COALESCE(asub.transcriptions_remaining, 0) AS transcriptions_remaining,
+              u.is_blocked, u.created_at
        FROM users u
        LEFT JOIN plans p ON p.id = u.plan_id
+       LEFT JOIN active_subscriptions asub ON asub.user_id = u.id
        ${whereSql}
        ORDER BY u.created_at DESC
        LIMIT ? OFFSET ?`,
@@ -139,18 +141,21 @@ router.get('/users/:id', async (req, res) => {
     const targetId = parseInt(req.params.id, 10);
 
     const [userRows] = await dbPool.query(
-      `SELECT id, email, name, role, is_blocked, subscription_plan, plan_id,
-              subscription_type, subscription_expires_at, subscription_auto_renewal,
-              auto_renewal_target_plan_id, transcriptions_remaining,
-              transcriptions_used, transcriptions_completed, chat_messages_remaining,
-              failed_payment_count, last_payment_date, card_mask,
-              yookassa_payment_method_id, created_at, updated_at,
-              onboarding_tour_completed_at, onboarding_phase2_completed_at,
-              retention_offer_state,
-              utm_source, utm_medium, utm_campaign, utm_term, utm_content,
-              utm_attribution_channel, gclid, yclid, referral_code,
-              telegram_id, telegram_username
-       FROM users WHERE id = ?`,
+      `SELECT u.id, u.email, u.name, u.role, u.is_blocked, u.subscription_plan, u.plan_id,
+              u.subscription_type, u.subscription_expires_at, u.subscription_auto_renewal,
+              u.auto_renewal_target_plan_id,
+              COALESCE(asub.transcriptions_remaining, 0) AS transcriptions_remaining,
+              u.transcriptions_used, u.transcriptions_completed, u.chat_messages_remaining,
+              u.failed_payment_count, u.last_payment_date, u.card_mask,
+              u.yookassa_payment_method_id, u.created_at, u.updated_at,
+              u.onboarding_tour_completed_at, u.onboarding_phase2_completed_at,
+              u.retention_offer_state,
+              u.utm_source, u.utm_medium, u.utm_campaign, u.utm_term, u.utm_content,
+              u.utm_attribution_channel, u.gclid, u.yclid, u.referral_code,
+              u.telegram_id, u.telegram_username
+       FROM users u
+       LEFT JOIN active_subscriptions asub ON asub.user_id = u.id
+       WHERE u.id = ?`,
       [targetId]
     );
     if (userRows.length === 0) {
@@ -267,7 +272,7 @@ router.patch('/users/:id', async (req, res) => {
     const [userRows] = await dbPool.query(
       `SELECT id, email, name, role, is_blocked, subscription_plan, plan_id,
               subscription_type, subscription_expires_at, subscription_auto_renewal,
-              auto_renewal_target_plan_id, transcriptions_remaining,
+              auto_renewal_target_plan_id,
               transcriptions_used, transcriptions_completed, chat_messages_remaining,
               failed_payment_count, last_payment_date, card_mask,
               yookassa_payment_method_id, created_at, updated_at,
