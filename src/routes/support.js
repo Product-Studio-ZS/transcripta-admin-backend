@@ -15,7 +15,7 @@ router.get('/support/chats', async (req, res) => {
       SELECT sc.*,
              u.email as linked_email, u.name as linked_name
       FROM support_chats sc
-      LEFT JOIN users u ON u.telegram_id = sc.telegram_user_id
+      LEFT JOIN users u ON u.id = sc.linked_user_id
       ORDER BY sc.last_message_at DESC
     `);
 
