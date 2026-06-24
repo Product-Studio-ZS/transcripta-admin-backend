@@ -10,6 +10,19 @@ const router = express.Router();
 router.use(authenticateToken);
 router.use(requireAdmin);
 
+// GET /plans — list active plans
+router.get('/plans', async (req, res) => {
+  try {
+    const [plans] = await dbPool.query(
+      'SELECT id, display_name, slug, monthly_price, yearly_price, version FROM plans WHERE is_active = 1 ORDER BY monthly_price ASC'
+    );
+    res.json({ plans });
+  } catch (error) {
+    console.error('[ADMIN-PLANS] List error:', error);
+    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Inlined from subscriptionService.js
 // ---------------------------------------------------------------------------
@@ -237,6 +250,7 @@ router.get('/users/:id', async (req, res) => {
         onboarding_phase2_completed_at: user.onboarding_phase2_completed_at,
         retention_offer_state: user.retention_offer_state,
         plan: planInfo.length > 0 ? planInfo[0] : null,
+        is_free_plan: planInfo.length > 0 && planInfo[0].monthly_price === 0,
       },
       active_subscription: activeSub.length > 0 ? activeSub[0] : null,
       recent_payments: payments,
@@ -308,10 +322,9 @@ router.patch('/users/:id', async (req, res) => {
         await dbPool.query(
           `UPDATE users u SET u.subscription_auto_renewal = 1,
            u.auto_renewal_target_plan_id = (
-             SELECT p.id FROM payment_history ph
-             JOIN plans p ON p.display_name = ph.plan_name AND p.valid_from <= ph.created_at
-             WHERE ph.user_id = u.id AND ph.status = 'succeeded' AND p.monthly_price > 0
-             ORDER BY ph.created_at DESC, p.valid_from DESC LIMIT 1
+             SELECT p.id FROM plans p
+             WHERE p.id = u.plan_id AND p.monthly_price > 0
+             LIMIT 1
            )
            WHERE u.id = ?`,
           [targetId]
