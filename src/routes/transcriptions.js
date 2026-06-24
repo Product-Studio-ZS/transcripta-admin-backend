@@ -14,7 +14,11 @@ router.get('/transcriptions', async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
     const offset = (page - 1) * limit;
-    const { status, email, filename } = req.query;
+    const { status, email, filename, sort, order } = req.query;
+
+    const ALLOWED_SORTS = ['id', 'created_at', 'duration', 'minutes_charged', 'retry_count', 'filename', 'status'];
+    const sortCol = ALLOWED_SORTS.includes(sort) ? sort : 'created_at';
+    const sortOrder = order === 'asc' ? 'ASC' : 'DESC';
 
     const whereClauses = [];
     const params = [];
@@ -44,12 +48,12 @@ router.get('/transcriptions', async (req, res) => {
     const [transcriptions] = await dbPool.query(
       `SELECT t.id, t.user_id, u.email as user_email, u.name as user_name,
               t.filename, t.status, t.duration, t.origin, t.media_type,
-              t.minutes_charged, t.transcription_provider, t.error_reason,
+              t.minutes_charged as minutes, t.transcription_provider as provider, t.error_reason,
               t.retry_count, t.created_at
        FROM transcriptions t
        JOIN users u ON u.id = t.user_id
        ${whereSql}
-       ORDER BY t.created_at DESC
+       ORDER BY t.${sortCol} ${sortOrder}
        LIMIT ? OFFSET ?`,
       [...params, limit, offset]
     );
