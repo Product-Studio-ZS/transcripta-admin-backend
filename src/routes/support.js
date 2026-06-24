@@ -192,4 +192,20 @@ router.post('/support/chats/:chatId/link', async (req, res) => {
   }
 });
 
+// DELETE /api/admin/support/chats/:chatId/link
+router.delete('/support/chats/:chatId/link', async (req, res) => {
+  try {
+    const chatId = parseInt(req.params.chatId, 10);
+    const [chatRows] = await dbPool.query('SELECT * FROM support_chats WHERE id = ?', [chatId]);
+    if (chatRows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Чат не найден' });
+    }
+    await dbPool.query('UPDATE support_chats SET linked_user_id = NULL WHERE id = ?', [chatId]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[ADMIN-SUPPORT] Unlink user error:', error);
+    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+  }
+});
+
 export default router;
