@@ -8,6 +8,82 @@ const router = express.Router();
 router.use(authenticateToken);
 router.use(requireAdmin);
 
+// GET /api/admin/transcriptions — list with pagination and filters
+router.get('/transcriptions', async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const offset = (page - 1) * limit;
+    const { status, email, filename } = req.query;
+
+    const whereClauses = [];
+    const params = [];
+
+    if (status) {
+      whereClauses.push('t.status = ?');
+      params.push(status);
+    }
+    if (email) {
+      whereClauses.push('u.email LIKE ?');
+      params.push(`%${email}%`);
+    }
+    if (filename) {
+      whereClauses.push('t.filename LIKE ?');
+      params.push(`%${filename}%`);
+    }
+
+    const whereSql = whereClauses.length > 0 ? 'WHERE ' + whereClauses.join(' AND ') : '';
+
+    const [countRows] = await dbPool.query(
+      `SELECT COUNT(*) as total FROM transcriptions t JOIN users u ON u.id = t.user_id ${whereSql}`,
+      params
+    );
+    const total = countRows[0].total;
+    const totalPages = Math.ceil(total / limit);
+
+    const [transcriptions] = await dbPool.query(
+      `SELECT t.id, t.user_id, u.email as user_email, u.name as user_name,
+              t.filename, t.status, t.duration, t.origin, t.media_type,
+              t.minutes_charged, t.transcription_provider, t.error_reason,
+              t.retry_count, t.created_at
+       FROM transcriptions t
+       JOIN users u ON u.id = t.user_id
+       ${whereSql}
+       ORDER BY t.created_at DESC
+       LIMIT ? OFFSET ?`,
+      [...params, limit, offset]
+    );
+
+    res.json({ transcriptions, pagination: { page, limit, total, totalPages } });
+  } catch (error) {
+    console.error('[ADMIN-TRANSCRIPTIONS] List error:', error);
+    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+  }
+});
+
+// GET /api/admin/transcriptions/:id — detail
+router.get('/transcriptions/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+
+    const [rows] = await dbPool.query(
+      `SELECT t.*, u.email as user_email, u.name as user_name
+       FROM transcriptions t
+       JOIN users u ON u.id = t.user_id
+       WHERE t.id = ?`,
+      [id]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Транскрипция не найдена' });
+    }
+
+    res.json({ transcription: rows[0] });
+  } catch (error) {
+    console.error('[ADMIN-TRANSCRIPTIONS] Detail error:', error);
+    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+  }
+});
+
 // POST /api/admin/transcriptions/:id/retry
 router.post('/transcriptions/:id/retry', async (req, res) => {
   try {
