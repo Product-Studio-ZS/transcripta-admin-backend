@@ -11,6 +11,10 @@ export default {
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'transcripta',
   },
+  redis: {
+    host: process.env.REDIS_HOST || 'localhost',
+    port: parseInt(process.env.REDIS_PORT) || 6379,
+  },
   cors: { origin: process.env.CORS_ORIGIN || 'https://admin.transcripta.ru' },
   telegram: {
     botToken: process.env.TELEGRAM_BOT_TOKEN || '',
@@ -29,5 +33,11 @@ export default {
   },
   github: {
     token: process.env.GITHUB_TOKEN || '',
+  },
+  vast: {
+    apiKey: process.env.VAST_API_KEY || '',
+  },
+  salad: {
+    apiKey: process.env.SALAD_API_KEY || '',
   },
 };

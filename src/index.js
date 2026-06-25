@@ -11,6 +11,7 @@ import adminsRoutes from './routes/admins.js';
 import supportRoutes from './routes/support.js';
 import transcriptionsRoutes from './routes/transcriptions.js';
 import docsRoutes from './routes/docs.js';
+import fleetRoutes from './routes/fleet.js';
 
 const app = express();
 
@@ -36,6 +37,7 @@ app.use('/api/admin', adminsRoutes);
 app.use('/api/admin', supportRoutes);
 app.use('/api/admin', transcriptionsRoutes);
 app.use('/api/admin', docsRoutes);
+app.use('/api/admin', fleetRoutes);
 
 app.listen(config.port, () => {
   console.log(`Admin backend listening on port ${config.port}`);
