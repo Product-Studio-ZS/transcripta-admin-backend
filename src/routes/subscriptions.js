@@ -462,6 +462,42 @@ router.get('/subscriptions/renewals', async (req, res) => {
   }
 });
 
+// GET /subscriptions/:id — subscription detail
+router.get('/subscriptions/:id', async (req, res) => {
+  try {
+    const subId = parseInt(req.params.id, 10);
+    const [rows] = await dbPool.query(
+      `SELECT asub.*, u.email as user_email, u.name as user_name,
+              p.display_name as plan_display_name, p.slug as plan_slug,
+              p.monthly_price, p.yearly_price
+       FROM active_subscriptions asub
+       JOIN users u ON u.id = asub.user_id
+       LEFT JOIN plans p ON p.id = asub.plan_id
+       WHERE asub.id = ?`,
+      [subId]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Подписка не найдена' });
+    }
+
+    const sub = rows[0];
+    const [payments] = await dbPool.query(
+      `SELECT id, yookassa_payment_id, plan_name, amount, status, is_autopay,
+              payment_method_type, created_at
+       FROM payment_history
+       WHERE user_id = ?
+       ORDER BY created_at DESC
+       LIMIT 50`,
+      [sub.user_id]
+    );
+
+    res.json({ subscription: sub, payments });
+  } catch (error) {
+    console.error('[ADMIN-SUBS] Detail error:', error);
+    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+  }
+});
+
 // POST /subscriptions/:id/trigger-renewal
 router.post('/subscriptions/:id/trigger-renewal', async (req, res) => {
   const subId = parseInt(req.params.id, 10);

@@ -113,19 +113,19 @@ router.get('/payments/:id', async (req, res) => {
   try {
     const payId = parseInt(req.params.id, 10);
 
-    const [payments] = await dbPool.query(
-      `SELECT ph.*, u.email as user_email
+    const [rows] = await dbPool.query(
+      `SELECT ph.*, u.email as user_email, u.name as user_name
        FROM payment_history ph
        JOIN users u ON u.id = ph.user_id
        WHERE ph.id = ?`,
       [payId]
     );
 
-    if (payments.length === 0) {
+    if (rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Платёж не найден' });
     }
 
-    res.json(payments[0]);
+    res.json({ payment: rows[0] });
   } catch (error) {
     console.error('[ADMIN-PAYMENTS] Detail error:', error);
     res.status(500).json({ success: false, message: 'Ошибка сервера' });
