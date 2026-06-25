@@ -10,6 +10,24 @@ const router = express.Router();
 router.use(authenticateToken);
 router.use(requireAdmin);
 
+// GET /users/stats
+router.get('/users/stats', async (req, res) => {
+  try {
+    const [[{ total }]] = await dbPool.query('SELECT COUNT(*) as total FROM users');
+    const [[{ active_7d }]] = await dbPool.query(
+      'SELECT COUNT(*) as active_7d FROM users WHERE updated_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)'
+    );
+    const [[{ blocked }]] = await dbPool.query('SELECT COUNT(*) as blocked FROM users WHERE is_blocked = 1');
+    const [[{ with_payment }]] = await dbPool.query(
+      'SELECT COUNT(*) as with_payment FROM users WHERE yookassa_payment_method_id IS NOT NULL'
+    );
+    res.json({ total, active_7d, blocked, with_payment });
+  } catch (error) {
+    console.error('[ADMIN-USERS] Stats error:', error);
+    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+  }
+});
+
 // GET /plans — list active plans
 router.get('/plans', async (req, res) => {
   try {

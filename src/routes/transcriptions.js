@@ -8,6 +8,25 @@ const router = express.Router();
 router.use(authenticateToken);
 router.use(requireAdmin);
 
+// GET /transcriptions/stats
+router.get('/transcriptions/stats', async (req, res) => {
+  try {
+    const [[{ total }]] = await dbPool.query('SELECT COUNT(*) as total FROM transcriptions');
+    const [byStatus] = await dbPool.query(
+      'SELECT status, COUNT(*) as count FROM transcriptions GROUP BY status'
+    );
+    const stats = { total, completed: 0, error: 0, processing: 0 };
+    for (const row of byStatus) {
+      if (stats[row.status] !== undefined) stats[row.status] = row.count;
+    }
+    stats.error_rate = total > 0 ? Math.round((stats.error / total) * 1000) / 10 : 0;
+    res.json(stats);
+  } catch (error) {
+    console.error('[ADMIN-TRANSCRIPTIONS] Stats error:', error);
+    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+  }
+});
+
 // GET /api/admin/transcriptions — list with pagination and filters
 router.get('/transcriptions', async (req, res) => {
   try {
