@@ -202,7 +202,7 @@ router.get('/fleet', async (req, res) => {
 // POST /api/admin/fleet/spawn
 router.post('/fleet/spawn', async (req, res) => {
   try {
-    const { provider, count = 1 } = req.body;
+    const { provider } = req.body;
 
     if (!['vast', 'salad'].includes(provider)) {
       return res.status(400).json({ success: false, message: 'Недопустимый провайдер. Допустимые: vast, salad' });
@@ -273,8 +273,7 @@ async function spawnVast() {
   });
 
   if (!searchRes.ok) {
-    const text = await searchRes.text();
-    throw new Error(`Vast search failed: ${searchRes.status} ${text}`);
+    throw new Error(`Vast search failed: ${searchRes.status}`);
   }
 
   const searchData = await searchRes.json();
@@ -296,7 +295,6 @@ async function spawnVast() {
         body: JSON.stringify({
           image: 'sokol46/unified-worker:latest',
           disk: 20,
-          onstart_cmd: '',
           runtype: 'args',
         }),
       });
