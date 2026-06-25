@@ -467,12 +467,9 @@ router.get('/subscriptions/:id', async (req, res) => {
   try {
     const subId = parseInt(req.params.id, 10);
     const [rows] = await dbPool.query(
-      `SELECT asub.*, u.email as user_email, u.name as user_name,
-              p.display_name as plan_display_name, p.slug as plan_slug,
-              p.monthly_price, p.yearly_price
+      `SELECT asub.*, u.email as user_email, u.name as user_name
        FROM active_subscriptions asub
        JOIN users u ON u.id = asub.user_id
-       LEFT JOIN plans p ON p.id = asub.plan_id
        WHERE asub.id = ?`,
       [subId]
     );
