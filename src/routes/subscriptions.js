@@ -356,9 +356,29 @@ router.get('/subscriptions', async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
     const offset = (page - 1) * limit;
+    const { plan_name, email, auto_renewal } = req.query;
+
+    const whereClauses = ['a.end_date > NOW()'];
+    const params = [];
+
+    if (plan_name) {
+      whereClauses.push('a.plan_name = ?');
+      params.push(plan_name);
+    }
+    if (email) {
+      whereClauses.push('u.email LIKE ?');
+      params.push(`%${email}%`);
+    }
+    if (auto_renewal !== undefined && auto_renewal !== '') {
+      whereClauses.push('a.auto_renewal = ?');
+      params.push(auto_renewal === '1' ? 1 : 0);
+    }
+
+    const whereSql = whereClauses.join(' AND ');
 
     const [countRows] = await dbPool.query(
-      `SELECT COUNT(*) as total FROM active_subscriptions WHERE end_date > NOW()`
+      `SELECT COUNT(*) as total FROM active_subscriptions a JOIN users u ON u.id = a.user_id WHERE ${whereSql}`,
+      params
     );
     const total = countRows[0].total;
     const totalPages = Math.ceil(total / limit);
@@ -367,10 +387,10 @@ router.get('/subscriptions', async (req, res) => {
       `SELECT a.*, u.email as user_email, u.name as user_name
        FROM active_subscriptions a
        JOIN users u ON u.id = a.user_id
-       WHERE a.end_date > NOW()
+       WHERE ${whereSql}
        ORDER BY a.end_date ASC
        LIMIT ? OFFSET ?`,
-      [limit, offset]
+      [...params, limit, offset]
     );
 
     res.json({
@@ -426,35 +446,46 @@ router.get('/subscriptions/stats', async (req, res) => {
 // GET /subscriptions/renewals
 router.get('/subscriptions/renewals', async (req, res) => {
   try {
+    // Recent failed auto-renewals (exclude free plan)
     const [failedRecent] = await dbPool.query(
       `SELECT u.id as user_id, u.email, u.subscription_plan as plan_name,
               u.failed_payment_count, u.last_renewal_attempt_at
        FROM users u
        WHERE u.failed_payment_count > 0
          AND u.subscription_auto_renewal = true
+         AND u.subscription_plan != 'free'
        ORDER BY u.last_renewal_attempt_at DESC
-       LIMIT 50`
+       LIMIT 20`
     );
 
-    const [disabledCount] = await dbPool.query(
-      'SELECT COUNT(*) as count FROM users WHERE subscription_auto_renewal = false AND auto_renewal_disabled_reason IS NOT NULL'
+    // Recent renewal stats from event log (last 30 days)
+    const [renewalStats] = await dbPool.query(
+      `SELECT outcome, COUNT(*) as count
+       FROM subscription_event_log
+       WHERE event_type = 'auto_renewal'
+         AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+       GROUP BY outcome`
     );
 
-    const [retentionStats] = await dbPool.query(
-      `SELECT retention_offer_state, COUNT(*) as count
-       FROM users WHERE retention_offer_state IN ('accepted', 'declined')
-       GROUP BY retention_offer_state`
-    );
-
-    const retention = { accepted: 0, declined: 0 };
-    for (const row of retentionStats) {
-      retention[row.retention_offer_state] = row.count;
+    let successful = 0, failed = 0;
+    for (const row of renewalStats) {
+      if (row.outcome === 'succeeded') successful = row.count;
+      else failed += row.count;
     }
 
+    // Disabled auto-renewal count (paid plans only)
+    const [disabledCount] = await dbPool.query(
+      `SELECT COUNT(*) as count FROM users
+       WHERE subscription_auto_renewal = false
+         AND auto_renewal_disabled_reason IS NOT NULL
+         AND subscription_plan != 'free'`
+    );
+
     res.json({
+      successful,
+      failed,
       failed_recent: failedRecent,
       disabled_count: disabledCount[0].count,
-      retention_stats: retention,
     });
   } catch (error) {
     console.error('[ADMIN-SUBS] Renewals error:', error);
