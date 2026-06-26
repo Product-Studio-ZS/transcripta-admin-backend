@@ -5,6 +5,55 @@ import { authenticateToken, requireAdmin } from '../authMiddleware.js';
 
 const router = express.Router();
 
+// In-memory cache for Telegram file paths (TTL 1 hour)
+const filePathCache = new Map();
+
+// GET /api/admin/support/attachment/:fileId — proxy photo from Telegram
+// MUST be before auth middleware: <img> tags don't send Authorization header
+router.get('/support/attachment/:fileId', async (req, res) => {
+  try {
+    const { fileId } = req.params;
+    const botToken = config.telegram.botToken;
+    if (!botToken) {
+      return res.status(503).json({ success: false, message: 'Telegram бот не настроен' });
+    }
+
+    const cached = filePathCache.get(fileId);
+    let fileUrl;
+    if (cached && Date.now() - cached.at < 3600_000) {
+      fileUrl = cached.url;
+    } else {
+      const tgResp = await fetch(
+        `https://api.telegram.org/bot${botToken}/getFile?file_id=${encodeURIComponent(fileId)}`
+      );
+      const tgData = await tgResp.json();
+      if (!tgData.ok || !tgData.result?.file_path) {
+        return res.status(404).json({ success: false, message: 'Файл не найден в Telegram' });
+      }
+      fileUrl = `https://api.telegram.org/file/bot${botToken}/${tgData.result.file_path}`;
+      filePathCache.set(fileId, { url: fileUrl, at: Date.now() });
+    }
+
+    const fileResp = await fetch(fileUrl);
+    if (!fileResp.ok) {
+      return res.status(502).json({ success: false, message: 'Ошибка загрузки файла' });
+    }
+
+    const contentType = fileResp.headers.get('content-type') || 'image/jpeg';
+    const buffer = await fileResp.arrayBuffer();
+
+    res.set({
+      'Content-Type': contentType,
+      'Content-Length': buffer.byteLength,
+      'Cache-Control': 'public, max-age=3600',
+    });
+    res.send(Buffer.from(buffer));
+  } catch (error) {
+    console.error('[ADMIN-SUPPORT] Attachment proxy error:', error);
+    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+  }
+});
+
 router.use(authenticateToken);
 router.use(requireAdmin);
 
@@ -204,54 +253,6 @@ router.delete('/support/chats/:chatId/link', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('[ADMIN-SUPPORT] Unlink user error:', error);
-    res.status(500).json({ success: false, message: 'Ошибка сервера' });
-  }
-});
-
-// In-memory cache for Telegram file paths (TTL 1 hour)
-const filePathCache = new Map();
-
-// GET /api/admin/support/attachment/:fileId — proxy photo from Telegram
-router.get('/support/attachment/:fileId', async (req, res) => {
-  try {
-    const { fileId } = req.params;
-    const botToken = config.telegram.botToken;
-    if (!botToken) {
-      return res.status(503).json({ success: false, message: 'Telegram бот не настроен' });
-    }
-
-    const cached = filePathCache.get(fileId);
-    let fileUrl;
-    if (cached && Date.now() - cached.at < 3600_000) {
-      fileUrl = cached.url;
-    } else {
-      const tgResp = await fetch(
-        `https://api.telegram.org/bot${botToken}/getFile?file_id=${encodeURIComponent(fileId)}`
-      );
-      const tgData = await tgResp.json();
-      if (!tgData.ok || !tgData.result?.file_path) {
-        return res.status(404).json({ success: false, message: 'Файл не найден в Telegram' });
-      }
-      fileUrl = `https://api.telegram.org/file/bot${botToken}/${tgData.result.file_path}`;
-      filePathCache.set(fileId, { url: fileUrl, at: Date.now() });
-    }
-
-    const fileResp = await fetch(fileUrl);
-    if (!fileResp.ok) {
-      return res.status(502).json({ success: false, message: 'Ошибка загрузки файла' });
-    }
-
-    const contentType = fileResp.headers.get('content-type') || 'image/jpeg';
-    const buffer = await fileResp.arrayBuffer();
-
-    res.set({
-      'Content-Type': contentType,
-      'Content-Length': buffer.byteLength,
-      'Cache-Control': 'public, max-age=3600',
-    });
-    res.send(Buffer.from(buffer));
-  } catch (error) {
-    console.error('[ADMIN-SUPPORT] Attachment proxy error:', error);
     res.status(500).json({ success: false, message: 'Ошибка сервера' });
   }
 });
