@@ -130,40 +130,38 @@ router.post('/transcriptions/:id/retry', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Нет источника для повторной обработки (s3_media_url или source_url)' });
     }
 
-    await dbPool.query(
-      `UPDATE transcriptions SET
-        status = 'processing',
-        error_reason = NULL,
-        transcription = '[]',
-        retry_count = COALESCE(retry_count, 0) + 1,
-        updated_at = NOW()
-       WHERE id = ?`,
-      [transcriptionId]
-    );
-
-    // Dispatch to AI server
-    const aiServerUrl = `${config.ai.serverBaseUrl}/transcribe-url`;
+    // Call main backend internal endpoint (unified async path, #407)
+    const backendInternalUrl = `${config.backend.internalUrl}/api/internal/admin-retry`;
 
     try {
-      const payload = {
-        url: t.s3_media_url || t.source_url,
-        transcription_id: transcriptionId,
-        language: t.language || 'auto',
-        origin: t.origin || 'web',
-      };
-
-      const aiResponse = await fetch(aiServerUrl, {
+      const backendResponse = await fetch(backendInternalUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Worker-Secret': config.backend.workerClaimSecret,
+        },
+        body: JSON.stringify({ transcriptionId }),
       });
 
-      if (!aiResponse.ok) {
-        const errText = await aiResponse.text();
-        console.error(`[ADMIN-RETRY] AI server error for transcription ${transcriptionId}: ${aiResponse.status} ${errText}`);
+      if (!backendResponse.ok) {
+        const errText = await backendResponse.text();
+        console.error(`[ADMIN-RETRY] Backend internal error for transcription ${transcriptionId}: ${backendResponse.status} ${errText}`);
+        return res.status(502).json({
+          success: false,
+          message: `Backend error: ${backendResponse.status}`,
+          details: errText.substring(0, 200),
+        });
       }
-    } catch (aiError) {
-      console.error(`[ADMIN-RETRY] AI server unreachable for transcription ${transcriptionId}:`, aiError.message);
+
+      const backendResult = await backendResponse.json();
+      console.log(`[ADMIN-RETRY] Enqueued transcription ${transcriptionId} via async pipeline, origin=${backendResult.origin}`);
+    } catch (fetchError) {
+      console.error(`[ADMIN-RETRY] Backend unreachable for transcription ${transcriptionId}:`, fetchError.message);
+      return res.status(502).json({
+        success: false,
+        message: 'Main backend unreachable',
+        details: fetchError.message,
+      });
     }
 
     // Audit log
@@ -178,7 +176,7 @@ router.post('/transcriptions/:id/retry', async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Транскрипция отправлена на повторную обработку',
+      message: 'Транскрипция отправлена на повторную обработку (async pipeline)',
       transcription_id: transcriptionId,
       previous_status: t.status,
       retry_count: (t.retry_count || 0) + 1,
