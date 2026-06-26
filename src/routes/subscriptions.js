@@ -356,7 +356,7 @@ router.get('/subscriptions', async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
     const offset = (page - 1) * limit;
-    const { plan_name, email, auto_renewal } = req.query;
+    const { plan_name, email, auto_renewal, subscription_type } = req.query;
 
     const whereClauses = ['a.end_date > NOW()'];
     const params = [];
@@ -372,6 +372,10 @@ router.get('/subscriptions', async (req, res) => {
     if (auto_renewal !== undefined && auto_renewal !== '') {
       whereClauses.push('a.auto_renewal = ?');
       params.push(auto_renewal === '1' ? 1 : 0);
+    }
+    if (subscription_type) {
+      whereClauses.push('a.subscription_type = ?');
+      params.push(subscription_type);
     }
 
     const whereSql = whereClauses.join(' AND ');
