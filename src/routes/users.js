@@ -250,7 +250,7 @@ router.get('/users/:id', async (req, res) => {
         name: user.name,
         role: user.role || 'user',
         is_blocked: !!user.is_blocked,
-        is_test: !!user.is_test,
+        is_test: user.is_test === '1' || user.is_test === 1,
         subscription_plan: user.subscription_plan,
         plan_id: user.plan_id,
         subscription_type: user.subscription_type,
