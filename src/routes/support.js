@@ -57,6 +57,19 @@ router.get('/support/attachment/:fileId', async (req, res) => {
 router.use(authenticateToken);
 router.use(requireAdmin);
 
+// GET /api/admin/support/unread-count — badge in sidebar
+router.get('/support/unread-count', async (req, res) => {
+  try {
+    const [rows] = await dbPool.query(
+      "SELECT COUNT(*) as unread FROM support_chats WHERE is_read = 0 AND last_message_direction = 'incoming'"
+    );
+    res.json({ unread: rows[0].unread });
+  } catch (error) {
+    console.error('[ADMIN-SUPPORT] Unread count error:', error);
+    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+  }
+});
+
 // GET /api/admin/support/chats
 router.get('/support/chats', async (req, res) => {
   try {
