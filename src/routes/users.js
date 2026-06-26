@@ -148,6 +148,7 @@ router.get('/users', async (req, res) => {
       name: u.name,
       role: u.role || 'user',
       subscription_plan: u.subscription_plan_name,
+      subscription_type: u.subscription_type,
       plan_id: u.plan_id,
       subscription_expires_at: u.subscription_expires_at,
       subscription_auto_renewal: !!u.subscription_auto_renewal,
