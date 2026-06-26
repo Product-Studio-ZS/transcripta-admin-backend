@@ -154,7 +154,7 @@ router.get('/users', async (req, res) => {
       subscription_auto_renewal: !!u.subscription_auto_renewal,
       transcriptions_remaining: u.transcriptions_remaining,
       is_blocked: !!u.is_blocked,
-      is_test: !!u.is_test,
+      is_test: u.is_test === '1' || u.is_test === 1,
       created_at: u.created_at,
     }));
 
