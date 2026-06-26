@@ -16,6 +16,10 @@ export default {
     port: parseInt(process.env.REDIS_PORT) || 6379,
   },
   cors: { origin: process.env.CORS_ORIGIN || 'https://admin.transcripta.ru' },
+  backend: {
+    internalUrl: process.env.BACKEND_INTERNAL_URL || 'http://127.0.0.1:9000',
+    workerClaimSecret: process.env.WORKER_CLAIM_SECRET || 'dev-secret',
+  },
   telegram: {
     botToken: process.env.TELEGRAM_BOT_TOKEN || '',
     targetChatId: process.env.TELEGRAM_TARGET_CHAT_ID || '',
