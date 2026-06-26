@@ -13,9 +13,9 @@ router.get('/support/chats', async (req, res) => {
   try {
     const [chats] = await dbPool.query(`
       SELECT sc.*,
-             COALESCE(u_tg.id, sc.linked_user_id) as linked_user_id,
-             COALESCE(u_tg.email, u_link.email) as linked_email,
-             COALESCE(u_tg.name, u_link.name) as linked_name
+             COALESCE(u_link.id, u_tg.id) as linked_user_id,
+             COALESCE(u_link.email, u_tg.email) as linked_email,
+             COALESCE(u_link.name, u_tg.name) as linked_name
       FROM support_chats sc
       LEFT JOIN users u_tg ON u_tg.telegram_id = sc.telegram_user_id
       LEFT JOIN users u_link ON u_link.id = sc.linked_user_id
