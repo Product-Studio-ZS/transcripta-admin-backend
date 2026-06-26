@@ -132,7 +132,7 @@ router.get('/users', async (req, res) => {
               COALESCE(p.display_name, u.subscription_plan) as subscription_plan_name,
               u.subscription_expires_at, u.subscription_auto_renewal,
               COALESCE(asub.transcriptions_remaining, 0) AS transcriptions_remaining,
-              u.is_blocked, u.created_at
+              u.is_blocked, u.is_test, u.created_at
        FROM users u
        LEFT JOIN plans p ON p.id = u.plan_id
        LEFT JOIN active_subscriptions asub ON asub.user_id = u.id
@@ -153,6 +153,7 @@ router.get('/users', async (req, res) => {
       subscription_auto_renewal: !!u.subscription_auto_renewal,
       transcriptions_remaining: u.transcriptions_remaining,
       is_blocked: !!u.is_blocked,
+      is_test: !!u.is_test,
       created_at: u.created_at,
     }));
 
@@ -248,6 +249,7 @@ router.get('/users/:id', async (req, res) => {
         name: user.name,
         role: user.role || 'user',
         is_blocked: !!user.is_blocked,
+        is_test: !!user.is_test,
         subscription_plan: user.subscription_plan,
         plan_id: user.plan_id,
         subscription_type: user.subscription_type,
@@ -424,6 +426,10 @@ router.patch('/users/:id', async (req, res) => {
 
       case 'unblock':
         await dbPool.query('UPDATE users SET is_blocked = 0 WHERE id = ?', [targetId]);
+        break;
+
+      case 'toggle_test':
+        await dbPool.query('UPDATE users SET is_test = IF(COALESCE(is_test, 0) = 1, 0, 1) WHERE id = ?', [targetId]);
         break;
 
       case 'unbind_card':
