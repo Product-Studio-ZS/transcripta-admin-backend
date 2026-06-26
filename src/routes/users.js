@@ -174,7 +174,7 @@ router.get('/users/:id', async (req, res) => {
     const targetId = parseInt(req.params.id, 10);
 
     const [userRows] = await dbPool.query(
-      `SELECT u.id, u.email, u.name, u.role, u.is_blocked, u.subscription_plan, u.plan_id,
+      `SELECT u.id, u.email, u.name, u.role, u.is_blocked, u.is_test, u.subscription_plan, u.plan_id,
               u.subscription_type, u.subscription_expires_at, u.subscription_auto_renewal,
               u.auto_renewal_target_plan_id,
               COALESCE(asub.transcriptions_remaining, 0) AS transcriptions_remaining,
