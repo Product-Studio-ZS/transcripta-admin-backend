@@ -13,7 +13,7 @@ router.get('/payments', async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
     const offset = (page - 1) * limit;
-    const { status: paymentStatus, date_from, date_to, email } = req.query;
+    const { status: paymentStatus, date_from, date_to, email, type } = req.query;
 
     let whereClauses = [];
     let params = [];
@@ -34,6 +34,13 @@ router.get('/payments', async (req, res) => {
       whereClauses.push('u.email LIKE ?');
       params.push(`%${email}%`);
     }
+    if (type === 'extra_minutes') {
+      whereClauses.push("ph.plan_name = 'Дополнительные минуты'");
+    } else if (type === 'auto_renewal') {
+      whereClauses.push("ph.is_autopay = 1 AND ph.plan_name != 'Дополнительные минуты'");
+    } else if (type === 'initial') {
+      whereClauses.push("ph.is_autopay = 0 AND ph.plan_name != 'Дополнительные минуты'");
+    }
 
     const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
 
@@ -47,7 +54,12 @@ router.get('/payments', async (req, res) => {
     const [payments] = await dbPool.query(
       `SELECT ph.id, ph.user_id, u.email as user_email, ph.yookassa_payment_id,
               ph.plan_name, ph.amount, ph.status, ph.is_autopay,
-              ph.payment_method_type, ph.created_at
+              ph.payment_method_type, ph.created_at,
+              CASE
+                WHEN ph.plan_name = 'Дополнительные минуты' THEN 'extra_minutes'
+                WHEN ph.is_autopay = 1 THEN 'auto_renewal'
+                ELSE 'initial'
+              END as payment_type
        FROM payment_history ph
        JOIN users u ON u.id = ph.user_id
        ${whereSql}
@@ -96,11 +108,29 @@ router.get('/payments/stats', async (req, res) => {
       byStatusMap[row.status] = row.count;
     }
 
+    const [byType] = await dbPool.query(
+      `SELECT
+         CASE
+           WHEN plan_name = 'Дополнительные минуты' THEN 'extra_minutes'
+           WHEN is_autopay = 1 THEN 'auto_renewal'
+           ELSE 'initial'
+         END as payment_type,
+         COUNT(*) as count
+       FROM payment_history WHERE created_at >= ${sinceSql}
+       GROUP BY payment_type`
+    );
+
+    const byTypeMap = {};
+    for (const row of byType) {
+      byTypeMap[row.payment_type] = row.count;
+    }
+
     res.json({
       total_count: totals[0].total_count,
       total_amount: parseFloat(totals[0].total_amount) || 0,
       avg_amount: Math.round((parseFloat(totals[0].avg_amount) || 0) * 100) / 100,
       by_status: byStatusMap,
+      by_type: byTypeMap,
     });
   } catch (error) {
     console.error('[ADMIN-PAYMENTS] Stats error:', error);
