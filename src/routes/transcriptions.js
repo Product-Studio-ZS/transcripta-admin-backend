@@ -130,38 +130,24 @@ router.post('/transcriptions/:id/retry', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Нет источника для повторной обработки (s3_media_url или source_url)' });
     }
 
-    // Call main backend internal endpoint (unified async path, #407)
-    const backendInternalUrl = `${config.backend.internalUrl}/api/internal/admin-retry`;
+    // Dispatch directly to AI server
+    if (config.ai?.serverBaseUrl) {
+      try {
+        const payload = {
+          url: t.s3_media_url || t.source_url,
+          transcription_id: transcriptionId,
+          language: t.language || 'auto',
+          origin: t.origin || 'web',
+        };
 
-    try {
-      const backendResponse = await fetch(backendInternalUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Worker-Secret': config.backend.workerClaimSecret,
-        },
-        body: JSON.stringify({ transcriptionId }),
-      });
-
-      if (!backendResponse.ok) {
-        const errText = await backendResponse.text();
-        console.error(`[ADMIN-RETRY] Backend internal error for transcription ${transcriptionId}: ${backendResponse.status} ${errText}`);
-        return res.status(502).json({
-          success: false,
-          message: `Backend error: ${backendResponse.status}`,
-          details: errText.substring(0, 200),
+        await fetch(`${config.ai.serverBaseUrl}/transcribe-url`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
         });
+      } catch (aiError) {
+        console.error(`[ADMIN-RETRY] AI server error for transcription ${transcriptionId}:`, aiError.message);
       }
-
-      const backendResult = await backendResponse.json();
-      console.log(`[ADMIN-RETRY] Enqueued transcription ${transcriptionId} via async pipeline, origin=${backendResult.origin}`);
-    } catch (fetchError) {
-      console.error(`[ADMIN-RETRY] Backend unreachable for transcription ${transcriptionId}:`, fetchError.message);
-      return res.status(502).json({
-        success: false,
-        message: 'Main backend unreachable',
-        details: fetchError.message,
-      });
     }
 
     // Audit log
