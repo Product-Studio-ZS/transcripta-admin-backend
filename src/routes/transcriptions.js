@@ -162,7 +162,7 @@ router.post('/transcriptions/:id/retry', async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Транскрипция отправлена на повторную обработку (async pipeline)',
+      message: 'Транскрипция отправлена на повторную обработку',
       transcription_id: transcriptionId,
       previous_status: t.status,
       retry_count: (t.retry_count || 0) + 1,
